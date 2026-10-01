@@ -1,0 +1,5 @@
+PyQt5>=5.15
+keyring            # stores API keys in Windows Credential Manager
+google-genai       # AI: Gemini (free tier)
+openai             # AI: GPT, and local Ollama
+anthropic>=1.11    # AI: Claude
