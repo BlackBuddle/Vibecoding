@@ -121,7 +121,7 @@ python -m unittest discover -s tests -t .
 
 ## 10. 학습 폴더 등록 + 파일 열기 시작 위치 (같은 날 후속 작업)
 
-> 자동완성 PR(`feature/autocomplete`) 위에서 이어서 작업했고, 이 장의 변경은 따로 커밋하기 전 상태다.
+> 자동완성 PR(`feature/autocomplete`) 위에서 이어서 작업했다. 이 장의 변경은 커밋 `b241cf3`(코드)·`8fedad3`(문서)로 PR #1에 담겨 `Dawnilove/Vibecoding`의 `main`에 병합됐다(병합 커밋 `4c1bd2d`).
 
 ### 요구와 결정
 
@@ -158,7 +158,8 @@ python -m unittest discover -s tests -t .
 
 ## 11. 학습 폴더의 Main 파일을 최근 파일 자리에 보여 주기 (같은 날 후속 작업)
 
-> 10장과 마찬가지로 이 장의 변경은 따로 커밋하기 전 상태다.
+> 이 장의 변경은 커밋 `ca34d3c`(코드)·`ded878e`(문서)이고, PR #1이 이미 병합된 뒤에 만들어져서 **후속 PR**로 보냈다.
+> (PR #1에 푸시해도 병합이 끝난 PR에는 커밋이 반영되지 않는다는 점을 푸시한 뒤에야 확인했다.)
 
 ### 요구와 결정
 
