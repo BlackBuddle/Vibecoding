@@ -79,7 +79,8 @@ python -m unittest discover -s tests -t .
 - 결과: **45개 통과** (후보 로직 27 + 편집기 동작 18), 약 7초.
 - `pytest`는 이 PC에 없어서 표준 `unittest`를 썼다.
 - 실제 앱 창 확인(오프스크린 `MainWindow`에 임시 `.ui` + `Main.py`를 열고 입력): `self.pu` → Tab → `self.pushButton`, 이어서 `.cl` → Tab → `self.pushButton.clicked` 확인.
-  이 확인은 앱 설정이 레지스트리에 남지 않도록 `QSettings`를 임시 ini로 돌려서 했다.
+  이 확인에서는 앱 설정을 임시 ini로 돌렸다고 생각했지만 **그 방법은 효과가 없었다** (7장 7번). 그래서 확인 중 실제 앱 설정(레지스트리)이 바뀌었을 수 있다.
+  나중에 점검해서 임시 경로가 섞인 값을 원래대로 되돌렸다 (10장).
 - TDD 순서: 테스트 먼저 작성 → 실패 확인(모듈/메서드 없음) → 구현 → 통과. 테스트 작성 중 틀린 부분 2곳(불필요한 `setUp()` 재호출, Backspace 횟수)은 실행 전에 고쳤다.
 
 ## 7. 함정 (다음 사람이 같은 데서 막히지 않도록)
@@ -91,6 +92,14 @@ python -m unittest discover -s tests -t .
 4. 이 PC는 `QT_QPA_PLATFORM_PLUGIN_PATH`가 낡은 값일 수 있어 `run.py`가 보정한다. 테스트는 `QT_QPA_PLATFORM=offscreen`으로 돌린다.
 5. `jedi`는 스레드에 안전하지 않다고 보고 **스레드 하나**에서만 호출한다. 호출을 병렬화하지 말 것.
 6. 지금은 `.py` 파일 경로를 jedi에 넘기지 않아 `from gui import Ui_MainWindow` 같은 이웃 파일 import는 해석하지 못한다 (아래 8장).
+7. **`QSettings.setDefaultFormat(...)`과 `QSettings.setPath(...)`로는 이 앱의 설정을 격리할 수 없다.** 앱이 `QSettings("PyQtStudyHelper", "PyQtStudyHelper")`처럼 조직·앱 이름으로 만들면 Windows에서는 기본 형식(레지스트리)이 쓰이기 때문이다.
+   실제 `MainWindow`를 띄워 파일을 열거나 폴더를 저장하는 확인 스크립트는 `HKCU\Software\PyQtStudyHelper`의 `recent`, `lastFile`, `lastDir`, `studyFolders`를 **진짜로 바꾼다**.
+   격리하려면 `MainWindow`를 만들기 전에 클래스를 바꿔 끼운다:
+   ```python
+   import studyhelper.mainwindow as M
+   M.QSettings = lambda *a, **k: QSettings(r"임시경로\isolated.ini", QSettings.IniFormat)
+   ```
+   이렇게 한 뒤 실제 설정의 키 개수와 해시가 전후로 같은지 비교해서 확인했다.
 
 ## 8. 남은 일 (이번 커밋에 없음)
 
@@ -99,12 +108,9 @@ python -m unittest discover -s tests -t .
 - **이웃 파일 해석**: `jedi.Script(source, path=...)`와 `jedi.Project`를 쓰면 `gui.py`의 `Ui_*` 클래스를 해석할 수 있다.
 - 큰 파일에서 느리면 `toPlainText()` 전달 방식을 줄이는 것도 고려.
 
-### 같은 날 추가로 요청받았지만 **아직 설계·승인 전**인 기능 (구현하지 않음)
+### 같은 날 추가로 요청받은 기능
 
-1. **학습할 폴더 경로를 미리 넣어두는 기능** — 어떤 방식인지(기본 폴더 하나인지, 여러 개 목록인지, 어디에 보이는지) 아직 정해지지 않았다.
-2. **파일 열기를 하면 이전에 열었던 디렉토리부터 보이게 하기** — `MainWindow.open_dialog()` (`studyhelper/mainwindow.py:667`) 쪽. 앱 설정은 `QSettings("PyQtStudyHelper", "PyQtStudyHelper")`에 저장된다 (`mainwindow.py:111`).
-
-이 둘은 자동완성과 별개의 작업이라 따로 설계 확인을 받고 진행한다.
+학습 폴더 등록과 파일 열기 시작 위치는 자동완성과 별개의 작업이라 따로 설계 확인을 받고 구현했다. 10장 참고.
 
 ## 9. 작업 환경 메모 (참고)
 
@@ -112,3 +118,40 @@ python -m unittest discover -s tests -t .
   `D:\git_down` 빈 폴더는 도구가 삭제를 막아 남아 있다.
 - `git`에 커밋 작성자(`user.name`, `user.email`)가 설정돼 있지 않았다. 이 저장소의 기존 커밋 작성자는 `Dawnilove`다.
 - 저장소에 `.gitignore`가 없어 `__pycache__/`가 추적 안 된 파일로 잡힌다. 커밋할 때 파일을 하나씩 지정해서 올렸다.
+
+## 10. 학습 폴더 등록 + 파일 열기 시작 위치 (같은 날 후속 작업)
+
+> 자동완성 PR(`feature/autocomplete`) 위에서 이어서 작업했고, 이 장의 변경은 따로 커밋하기 전 상태다.
+
+### 요구와 결정
+
+| 항목 | 결정 |
+|---|---|
+| 학습 폴더 등록 | **파일 열기 창 왼쪽 바로가기**로 보여 준다 (사용자 선택). 시작 화면 목록 방식은 채택하지 않음 |
+| 파일 열기 시작 폴더 | 열린 파일의 폴더 → 마지막에 연 폴더 → 첫 학습 폴더 → 내 문서(없으면 홈) |
+| 창 모양 | Qt 자체 파일 창으로 바뀐다. 윈도우 탐색기 모양의 기본 창은 왼쪽 바로가기를 추가할 수 없다. 설계 때 알리고 승인받음 |
+
+"이전에 열었던 폴더에서 시작"은 **이미 구현돼 있었다** (`open_path`가 `lastDir`를 저장하고 `open_dialog`가 읽음). 이번에는 그 폴더가 지워졌거나 옮겨졌을 때 다음 순위로 넘어가는 처리만 더했다.
+사용자가 안 된다고 느낀 원인은 재현하지 못했다. 처음 설치 직후라 저장된 값이 없었거나, 폴더 안쪽에서 시작해서 옆 폴더로 옮기기 불편했던 것으로 추정한다.
+
+### 구현
+
+- `studyhelper/studyfolders.py` (신규): 순수 함수(`start_dir`, `load_folders`, `save_folders`, `add_folder`, `remove_folder`, `existing_folders`, `sidebar_paths`)와 `make_file_dialog`/`pick_file`, 관리 창 `StudyFoldersDialog`.
+- `studyhelper/mainwindow.py`: 파일 메뉴에 "학습 폴더 관리…", `_pick_file()` 하나로 **열기**와 **도전 모드 .ui 고르기** 두 창을 같은 방식으로 연다.
+- 저장 위치: `QSettings`의 `studyFolders` (문자열 목록). 없어진 폴더는 저장은 유지하고(관리 창에서 "폴더를 찾을 수 없어요"로 표시해 지울 수 있게) 바로가기·시작 위치에서는 건너뛴다.
+- 바로가기 순서: 학습 폴더(있는 것만) → 홈·바탕화면·문서·다운로드 → 드라이브(C:, D: …). 중복은 경로를 정규화해서 제거한다 (`normcase` + `normpath`).
+- `QSettings`가 목록 1개를 문자열로 돌려주는 PyQt 함정은 방어 코드와 테스트를 넣었다. 이 PC(PyQt5 5.15.11, Python 3.14)에서는 레지스트리·ini 모두 목록으로 정상 왕복해서 함정이 **나타나지는 않았다**.
+
+### 테스트
+
+- `tests/test_studyfolders.py` 25개 (시작 폴더 우선순위, 저장·읽기, 목록 편집, 바로가기, 파일 창·관리 창).
+- 전체: `python -m unittest discover -s tests -t .` → **70개 통과** (자동완성 45 + 학습 폴더 25).
+- 실제 `MainWindow`를 오프스크린으로 띄워 확인 (설정은 7장 7번 방식으로 격리): 메뉴에 항목이 보이고, 저장하면 목록이 남고, 파일도 마지막 폴더도 없으면 첫 학습 폴더에서 시작하고, 마지막 폴더가 지워지면 첫 학습 폴더로 넘어가고, 파일 창 바로가기 맨 앞 두 칸이 학습 폴더였다.
+- **눈으로 못 본 것**: Qt 자체 파일 창이 실제 화면에 어떻게 보이는지(오프스크린이라 그려진 모습은 확인 못 함). 사람이 한 번 열어 봐야 한다.
+
+### 사고 기록: 확인 작업이 실제 앱 설정을 바꿈
+
+위 확인 스크립트를 처음 돌렸을 때 설정 격리가 안 돼서(7장 7번) `HKCU\Software\PyQtStudyHelper`가 바뀌었다.
+바뀐 것: `studyFolders`(원래 없던 값)가 생기고, `lastDir`·`lastFile`이 임시 폴더로 바뀌고, `recent` 맨 앞에 임시 파일이 들어갔다.
+조치: Qt(`QSettings`)로 직접 되돌렸다 — 임시 경로가 섞인 `recent` 항목을 지우고, `lastFile`은 `recent`의 첫 항목으로, `lastDir`은 그 파일의 폴더로 복원, `studyFolders`는 삭제. 되돌린 값은 확인 직전에 관찰한 `lastDir`(`...\1. Standard Dialog\ex4_1_04`)와 일치한다.
+한계: 원래 `lastFile`은 직접 관찰하지 못하고 `recent` 첫 항목으로 추정한 값이다. 앱을 열었을 때 마지막 파일이 예전과 다르면 이 때문일 수 있다.
