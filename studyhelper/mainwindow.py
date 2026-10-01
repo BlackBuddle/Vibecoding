@@ -738,21 +738,21 @@ class MainWindow(QMainWindow):
         self.tree.clear()
         self.panel.clear()
         if ui_path is None:
-            self.editor.set_names([])
+            self.editor.set_widgets({})
             self.preview.load(None, [])
             return
         try:
             self.model = UiModel(ui_path)
         except Exception as e:  # half-written file while Designer saves
             self._status(f"{ui_path.name} 를 읽지 못했어요: {e}")
-            self.editor.set_names([])
+            self.editor.set_widgets({})
             return
         try:
             self.generated = codeview.generate(ui_path)
         except Exception:
             self.generated = ""
         names = list(self.model.nodes)
-        self.editor.set_names(names)
+        self.editor.set_widgets({n: node.cls for n, node in self.model.nodes.items()})
         err = self.preview.load(ui_path, names)
         if err:
             self._status(f"미리보기 오류: {err}")
